@@ -7,7 +7,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
@@ -24,9 +24,9 @@ function generateRoomCode() {
 
 function createQuestion(difficulty = "easy") {
   const ranges = {
-    easy: { min: 1, max: 10, operations: ["+", "-"] },
-    medium: { min: 2, max: 12, operations: ["+", "-", "*"] },
-    hard: { min: 5, max: 20, operations: ["+", "-", "*", "/"] }
+    easy: { min: 1, max: 15, operations: ["+", "-"] },
+    medium: { min: 2, max: 50, operations: ["+", "-", "*"] },
+    hard: { min: 5, max: 100, operations: ["+", "-", "*", "/"] }
   };
 
   const config = ranges[difficulty] || ranges.easy;
