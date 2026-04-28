@@ -22,7 +22,7 @@ function generateRoomCode() {
   return Math.random().toString(36).slice(2, 6).toUpperCase();
 }
 
-function createQuestion(difficulty = "easy") {
+function createQuestion(difficulty = "easy", forcedOperation = null) {
   const ranges = {
     easy: { min: 1, max: 15, operations: ["+", "-"] },
     medium: { min: 2, max: 50, operations: ["+", "-", "*"] },
@@ -32,7 +32,7 @@ function createQuestion(difficulty = "easy") {
   const config = ranges[difficulty] || ranges.easy;
   const a = randomInt(config.min, config.max);
   const b = randomInt(config.min, config.max);
-  const operation = config.operations[Math.floor(Math.random() * config.operations.length)];
+  const operation = forcedOperation || config.operations[Math.floor(Math.random() * config.operations.length)];
 
   if (operation === "+") {
     return { prompt: `${a} + ${b}`, answer: a + b };
@@ -50,6 +50,21 @@ function createQuestion(difficulty = "easy") {
   }
 
   return { prompt: `${a} x ${b}`, answer: a * b };
+}
+
+function createQuestionPair(difficulty = "easy") {
+  const ranges = {
+    easy: { min: 1, max: 15, operations: ["+", "-"] },
+    medium: { min: 2, max: 50, operations: ["+", "-", "*"] },
+    hard: { min: 5, max: 100, operations: ["+", "-", "*", "/"] }
+  };
+  const config = ranges[difficulty] || ranges.easy;
+  const operation = config.operations[Math.floor(Math.random() * config.operations.length)];
+
+  return {
+    A: createQuestion(difficulty, operation),
+    B: createQuestion(difficulty, operation)
+  };
 }
 
 function randomInt(min, max) {
@@ -70,7 +85,7 @@ function createPlayerState(role, initialQuestion) {
 }
 
 function createRoom(roomCode) {
-  const initialQuestion = createQuestion("easy");
+  const initialPair = createQuestionPair("easy");
   return {
     roomCode,
     status: "waiting",
@@ -79,10 +94,10 @@ function createRoom(roomCode) {
     countdown: null,
     countdownTimer: null,
     teacherSocketId: null,
-    questionBank: [initialQuestion],
+    questionBank: [initialPair],
     players: {
-      A: createPlayerState("A", initialQuestion),
-      B: createPlayerState("B", initialQuestion)
+      A: createPlayerState("A", initialPair.A),
+      B: createPlayerState("B", initialPair.B)
     }
   };
 }
@@ -143,13 +158,13 @@ function startCountdown(room) {
   room.status = "countdown";
   room.countdown = COUNTDOWN_SECONDS;
   room.winner = null;
-  room.questionBank = [createQuestion(room.difficulty)];
+  room.questionBank = [createQuestionPair(room.difficulty)];
   room.players.A.score = 0;
   room.players.B.score = 0;
   room.players.A.questionIndex = 0;
   room.players.B.questionIndex = 0;
-  room.players.A.question = room.questionBank[0];
-  room.players.B.question = room.questionBank[0];
+  room.players.A.question = room.questionBank[0].A;
+  room.players.B.question = room.questionBank[0].B;
   room.players.A.lastResult = null;
   room.players.B.lastResult = null;
   emitRoomState(room.roomCode);
@@ -228,11 +243,11 @@ io.on("connection", (socket) => {
     }
 
     room.difficulty = ["easy", "medium", "hard"].includes(difficulty) ? difficulty : "easy";
-    room.questionBank = [createQuestion(room.difficulty)];
+    room.questionBank = [createQuestionPair(room.difficulty)];
     room.players.A.questionIndex = 0;
     room.players.B.questionIndex = 0;
-    room.players.A.question = room.questionBank[0];
-    room.players.B.question = room.questionBank[0];
+    room.players.A.question = room.questionBank[0].A;
+    room.players.B.question = room.questionBank[0].B;
     emitRoomState(room.roomCode);
   });
 
@@ -262,13 +277,13 @@ io.on("connection", (socket) => {
     room.status = "waiting";
     room.countdown = null;
     room.winner = null;
-    room.questionBank = [createQuestion(room.difficulty)];
+    room.questionBank = [createQuestionPair(room.difficulty)];
     room.players.A.score = 0;
     room.players.B.score = 0;
     room.players.A.questionIndex = 0;
     room.players.B.questionIndex = 0;
-    room.players.A.question = room.questionBank[0];
-    room.players.B.question = room.questionBank[0];
+    room.players.A.question = room.questionBank[0].A;
+    room.players.B.question = room.questionBank[0].B;
     room.players.A.lastResult = null;
     room.players.B.lastResult = null;
     emitRoomState(room.roomCode);
@@ -297,12 +312,12 @@ io.on("connection", (socket) => {
       }
     }
 
-    // Advance to next shared question
+    // Advance to next shared question pair
     player.questionIndex += 1;
     if (room.questionBank.length <= player.questionIndex) {
-      room.questionBank.push(createQuestion(room.difficulty));
+      room.questionBank.push(createQuestionPair(room.difficulty));
     }
-    player.question = room.questionBank[player.questionIndex];
+    player.question = room.questionBank[player.questionIndex][playerRole];
 
     emitRoomState(room.roomCode);
   });
