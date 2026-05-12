@@ -13,7 +13,7 @@ const io = new Server(httpServer, {
 });
 
 const PORT = process.env.PORT || 4000;
-const FINISH_SCORE = 15;
+const DEFAULT_FINISH_SCORE = 15;
 const COUNTDOWN_SECONDS = 3;
 
 const rooms = new Map();
@@ -25,6 +25,16 @@ const QUESTION_RANGES = {
 
 function generateRoomCode() {
   return Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
+function sanitizeFinishScore(value) {
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_FINISH_SCORE;
+  }
+
+  return Math.min(Math.max(parsed, 1), 99);
 }
 
 function generateQuestion(difficulty = "easy", forcedOperation = null) {
@@ -90,7 +100,7 @@ function createPlayerState(role, initialQuestion) {
   };
 }
 
-function createRoom(roomCode, gameMode = "pair") {
+function createRoom(roomCode, gameMode = "pair", finishScore = DEFAULT_FINISH_SCORE) {
   const initialPair = generateQuestionPair("easy");
   const players = {};
   
@@ -108,11 +118,14 @@ function createRoom(roomCode, gameMode = "pair") {
   return {
     roomCode,
     gameMode,
+    finishScore: sanitizeFinishScore(finishScore),
     status: "waiting",
     difficulty: "easy",
     winner: null,
     countdown: null,
     countdownTimer: null,
+    activeStartedAt: null,
+    finishedAt: null,
     teacherSocketId: null,
     questionBank: [initialPair],
     players
@@ -126,9 +139,9 @@ function clearCountdown(room) {
   }
 }
 
-function ensureRoom(roomCode, gameMode = "pair") {
+function ensureRoom(roomCode, gameMode = "pair", finishScore = DEFAULT_FINISH_SCORE) {
   if (!rooms.has(roomCode)) {
-    rooms.set(roomCode, createRoom(roomCode, gameMode));
+    rooms.set(roomCode, createRoom(roomCode, gameMode, finishScore));
   }
 
   return rooms.get(roomCode);
@@ -147,7 +160,9 @@ function sanitizeRoom(room) {
     difficulty: room.difficulty,
     winner: room.winner,
     countdown: room.countdown,
-    finishScore: FINISH_SCORE,
+    finishScore: room.finishScore,
+    activeStartedAt: room.activeStartedAt,
+    finishedAt: room.finishedAt,
     players: sanitizedPlayers
   };
 }
@@ -179,6 +194,8 @@ function startCountdown(room) {
   room.status = "countdown";
   room.countdown = COUNTDOWN_SECONDS;
   room.winner = null;
+  room.activeStartedAt = null;
+  room.finishedAt = null;
   room.questionBank = [generateQuestionPair(room.difficulty)];
   
   // Reset all connected players
@@ -202,6 +219,7 @@ function startCountdown(room) {
     clearCountdown(room);
     room.countdown = 0;
     room.status = "active";
+    room.activeStartedAt = Date.now();
     emitRoomState(room.roomCode);
   }, 1000);
 }
@@ -225,7 +243,7 @@ app.get("/api/room/new", (_, res) => {
 });
 
 app.post("/api/room/new", (req, res) => {
-  const { gameMode } = req.body;
+  const { gameMode, finishScore } = req.body;
   let roomCode = generateRoomCode();
 
   while (rooms.has(roomCode)) {
@@ -233,7 +251,7 @@ app.post("/api/room/new", (req, res) => {
   }
 
   const mode = ["pair", "multiple"].includes(gameMode) ? gameMode : "pair";
-  const room = ensureRoom(roomCode, mode);
+  const room = ensureRoom(roomCode, mode, finishScore);
   res.json(sanitizeRoom(room));
 });
 
@@ -313,6 +331,17 @@ io.on("connection", (socket) => {
     emitRoomState(room.roomCode);
   });
 
+  socket.on("room:setFinishScore", ({ roomCode, finishScore }) => {
+    const room = rooms.get(String(roomCode).trim().toUpperCase());
+
+    if (!room || room.status === "active" || room.status === "countdown") {
+      return;
+    }
+
+    room.finishScore = sanitizeFinishScore(finishScore);
+    emitRoomState(room.roomCode);
+  });
+
   socket.on("race:start", ({ roomCode }) => {
     const room = rooms.get(String(roomCode).trim().toUpperCase());
 
@@ -343,6 +372,8 @@ io.on("connection", (socket) => {
     room.status = "waiting";
     room.countdown = null;
     room.winner = null;
+    room.activeStartedAt = null;
+    room.finishedAt = null;
     room.questionBank = [generateQuestionPair(room.difficulty)];
     
     for (const [, player] of Object.entries(room.players)) {
@@ -372,10 +403,13 @@ io.on("connection", (socket) => {
     if (isCorrect) {
       player.score += 1;
 
-      if (player.score >= FINISH_SCORE && !room.winner) {
+      if (player.score >= room.finishScore && !room.winner) {
         room.winner = playerRole;
         room.status = "finished";
+        room.finishedAt = Date.now();
       }
+    } else {
+      player.score = Math.max(0, player.score - 1);
     }
 
     // Advance to next shared question pair

@@ -27,7 +27,7 @@ export default function QuestionCard({
           
           <div className="feedback-text">
             {feedback === "correct" && <span className="success-text">Correct! Speed up!</span>}
-            {feedback === "incorrect" && <span className="danger-text">Not quite. Try again!</span>}
+            {feedback === "incorrect" && <span className="danger-text">Wrong answer. Back one step!</span>}
             {!feedback && <span>{helperText}</span>}
           </div>
         </div>

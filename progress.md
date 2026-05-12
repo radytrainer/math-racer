@@ -27,3 +27,8 @@ Original prompt: Build a complete real-time web application called "Racing Calcu
 - Updated multiplayer race lanes to show each animal icon in the live scoreboard and on the moving racer token.
 - Added a compact fullscreen scoreboard treatment so multiplayer progress bars shrink and all racers are more likely to fit without scrolling.
 - Verified the frontend still builds successfully with `npm.cmd run build`.
+- Added a customizable finish target that the teacher can edit before the race, with the server now storing finish score per room instead of using a fixed value of 15.
+- Updated scoring so a wrong answer moves a racer back one step, while still advancing them to the next question.
+- Added finish celebrations with a stronger win sound, fireworks overlays, and explicit finish messages on both the teacher dashboard and player screen.
+- Added race-timer tracking plus a blinking red overtime warning signal after 3 minutes on both teacher and player views.
+- Verified the backend syntax with `node --check server/index.js` and the frontend with `npm.cmd run build`.

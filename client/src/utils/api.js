@@ -1,10 +1,10 @@
 const API_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 
-export async function createRoom(gameMode = "pair") {
+export async function createRoom(gameMode = "pair", finishScore = 15) {
   const response = await fetch(`${API_URL}/api/room/new`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ gameMode })
+    body: JSON.stringify({ gameMode, finishScore })
   });
 
   if (!response.ok) {
