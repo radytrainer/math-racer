@@ -694,6 +694,60 @@ body {
   opacity: 0.5;
 }
 
+/* Dual Progress Section */
+.dual-progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  width: 100%;
+}
+
+.dual-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dual-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.dual-bar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.dual-bar-name {
+  color: #fff;
+}
+
+.dual-bar-score {
+  color: #8b8b99;
+  margin-left: auto;
+}
+
+.dual-bar-you .dual-bar-name {
+  color: #00f0ff;
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.opponent-bar {
+  height: 12px;
+  background: #1a1a20;
+}
+
+.opponent-bar .progress-flag {
+  font-size: 0.6rem;
+  right: 5px;
+}
+
 /* Split Layout */
 .playing-split-layout {
   display: flex;

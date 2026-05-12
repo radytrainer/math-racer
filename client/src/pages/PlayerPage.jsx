@@ -140,7 +140,7 @@ export default function PlayerPage() {
           <div className="player-top-header">
             <div className="player-info-row">
               <div className="avatar-info">
-                <div className="small-avatar-ring">
+                <div className="small-avatar-ring" style={{ borderColor: playerRole === 'A' ? '#00f0ff' : '#f97316' }}>
                   <span className="small-avatar-text">{playerRole}</span>
                 </div>
                 <div className="info-text">
@@ -153,9 +153,43 @@ export default function PlayerPage() {
                 <span className="score-value">{player?.score || 0}</span>
               </div>
             </div>
-            <div className="player-progress-bar">
-               <div className="progress-fill" style={{ width: `${Math.min(((player?.score || 0) / (roomState?.finishScore || 15)) * 100, 100)}%`, background: playerRole === 'A' ? '#00f0ff' : '#f97316' }}></div>
-               <div className="progress-flag">🏁</div>
+
+            {/* Dual Progress Bars */}
+            <div className="dual-progress-section">
+              {/* Current player (YOU) — larger bar */}
+              <div className="dual-bar-row dual-bar-you">
+                <div className="dual-bar-label">
+                  <span className="dual-bar-dot" style={{ background: playerRole === 'A' ? '#00f0ff' : '#f97316' }}></span>
+                  <span className="dual-bar-name">YOU</span>
+                  <span className="dual-bar-score">{player?.score || 0}/{roomState?.finishScore || 15}</span>
+                </div>
+                <div className="player-progress-bar">
+                  <div className="progress-fill" style={{ width: `${Math.min(((player?.score || 0) / (roomState?.finishScore || 15)) * 100, 100)}%`, background: playerRole === 'A' ? '#00f0ff' : '#f97316' }}></div>
+                  <div className="progress-flag">🏁</div>
+                </div>
+              </div>
+
+              {/* Opponent — smaller bar */}
+              {(() => {
+                const opponentRole = playerRole === 'A' ? 'B' : 'A';
+                const opponent = roomState?.players?.[opponentRole];
+                const opponentScore = opponent?.score || 0;
+                const opponentColor = opponentRole === 'A' ? '#00f0ff' : '#f97316';
+                const opponentName = opponent?.name || `Player ${opponentRole}`;
+                return (
+                  <div className="dual-bar-row dual-bar-opponent">
+                    <div className="dual-bar-label">
+                      <span className="dual-bar-dot" style={{ background: opponentColor }}></span>
+                      <span className="dual-bar-name">{opponentName.toUpperCase()}</span>
+                      <span className="dual-bar-score">{opponentScore}/{roomState?.finishScore || 15}</span>
+                    </div>
+                    <div className="player-progress-bar opponent-bar">
+                      <div className="progress-fill" style={{ width: `${Math.min((opponentScore / (roomState?.finishScore || 15)) * 100, 100)}%`, background: opponentColor }}></div>
+                      <div className="progress-flag">🏁</div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
