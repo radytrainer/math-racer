@@ -24,3 +24,6 @@ Original prompt: Build a complete real-time web application called "Racing Calcu
 - Redesigned the teacher dashboard into a cleaner responsive layout with a top room summary, a dedicated setup/sidebar panel, and a larger live scoreboard area.
 - Fixed the teacher dashboard player launch links so multiplayer launch buttons point to `/player/:role` routes that actually exist.
 - Installed missing client dependencies locally and verified the updated frontend with `npm.cmd run build`.
+- Updated multiplayer race lanes to show each animal icon in the live scoreboard and on the moving racer token.
+- Added a compact fullscreen scoreboard treatment so multiplayer progress bars shrink and all racers are more likely to fit without scrolling.
+- Verified the frontend still builds successfully with `npm.cmd run build`.
