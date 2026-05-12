@@ -21,3 +21,6 @@ Original prompt: Build a complete real-time web application called "Racing Calcu
 - Renamed the server-side question helpers to `generateQuestion` and `generateQuestionPair`, and moved difficulty config into a shared `QUESTION_RANGES` constant to remove the identifier collision risk.
 - Fixed `ensureRoom` so the requested game mode is honored when a room is first created.
 - Verified the updated `server/index.js` passes `node --check`.
+- Redesigned the teacher dashboard into a cleaner responsive layout with a top room summary, a dedicated setup/sidebar panel, and a larger live scoreboard area.
+- Fixed the teacher dashboard player launch links so multiplayer launch buttons point to `/player/:role` routes that actually exist.
+- Installed missing client dependencies locally and verified the updated frontend with `npm.cmd run build`.
