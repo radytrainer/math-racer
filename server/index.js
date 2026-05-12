@@ -17,19 +17,18 @@ const FINISH_SCORE = 15;
 const COUNTDOWN_SECONDS = 3;
 
 const rooms = new Map();
+const QUESTION_RANGES = {
+  easy: { min: 1, max: 15, operations: ["+", "-"] },
+  medium: { min: 2, max: 50, operations: ["+", "-", "*"] },
+  hard: { min: 5, max: 100, operations: ["+", "-", "*", "/"] }
+};
 
 function generateRoomCode() {
   return Math.random().toString(36).slice(2, 6).toUpperCase();
 }
 
-function createQuestion(difficulty = "easy", forcedOperation = null) {
-  const ranges = {
-    easy: { min: 1, max: 15, operations: ["+", "-"] },
-    medium: { min: 2, max: 50, operations: ["+", "-", "*"] },
-    hard: { min: 5, max: 100, operations: ["+", "-", "*", "/"] }
-  };
-
-  const config = ranges[difficulty] || ranges.easy;
+function generateQuestion(difficulty = "easy", forcedOperation = null) {
+  const config = QUESTION_RANGES[difficulty] || QUESTION_RANGES.easy;
   const a = randomInt(config.min, config.max);
   const b = randomInt(config.min, config.max);
   const operation = forcedOperation || config.operations[Math.floor(Math.random() * config.operations.length)];
@@ -52,18 +51,13 @@ function createQuestion(difficulty = "easy", forcedOperation = null) {
   return { prompt: `${a} x ${b}`, answer: a * b };
 }
 
-function createQuestionPair(difficulty = "easy") {
-  const ranges = {
-    easy: { min: 1, max: 15, operations: ["+", "-"] },
-    medium: { min: 2, max: 50, operations: ["+", "-", "*"] },
-    hard: { min: 5, max: 100, operations: ["+", "-", "*", "/"] }
-  };
-  const config = ranges[difficulty] || ranges.easy;
+function generateQuestionPair(difficulty = "easy") {
+  const config = QUESTION_RANGES[difficulty] || QUESTION_RANGES.easy;
   const operation = config.operations[Math.floor(Math.random() * config.operations.length)];
 
   return {
-    A: createQuestion(difficulty, operation),
-    B: createQuestion(difficulty, operation)
+    A: generateQuestion(difficulty, operation),
+    B: generateQuestion(difficulty, operation)
   };
 }
 
@@ -96,38 +90,8 @@ function createPlayerState(role, initialQuestion) {
   };
 }
 
-function createQuestion(difficulty = "easy", forcedOperation = null) {
-  const ranges = {
-    easy: { min: 1, max: 15, operations: ["+", "-"] },
-    medium: { min: 2, max: 50, operations: ["+", "-", "*"] },
-    hard: { min: 5, max: 100, operations: ["+", "-", "*", "/"] }
-  };
-
-  const config = ranges[difficulty] || ranges.easy;
-  const a = randomInt(config.min, config.max);
-  const b = randomInt(config.min, config.max);
-  const operation = forcedOperation || config.operations[Math.floor(Math.random() * config.operations.length)];
-
-  if (operation === "+") {
-    return { prompt: `${a} + ${b}`, answer: a + b };
-  }
-
-  if (operation === "-") {
-    const top = Math.max(a, b);
-    const bottom = Math.min(a, b);
-    return { prompt: `${top} - ${bottom}`, answer: top - bottom };
-  }
-
-  if (operation === "/") {
-    const dividend = a * b;
-    return { prompt: `${dividend} ÷ ${a}`, answer: b };
-  }
-
-  return { prompt: `${a} x ${b}`, answer: a * b };
-}
-
 function createRoom(roomCode, gameMode = "pair") {
-  const initialPair = createQuestionPair("easy");
+  const initialPair = generateQuestionPair("easy");
   const players = {};
   
   if (gameMode === "pair") {
@@ -137,7 +101,7 @@ function createRoom(roomCode, gameMode = "pair") {
     // For multiple mode, create empty slots for players 1-5
     for (let i = 1; i <= 5; i++) {
       const role = String(i);
-      players[role] = createPlayerState(role, initialPair[role] || createQuestion("easy"));
+      players[role] = createPlayerState(role, initialPair[role] || generateQuestion("easy"));
     }
   }
   
@@ -162,9 +126,9 @@ function clearCountdown(room) {
   }
 }
 
-function ensureRoom(roomCode) {
+function ensureRoom(roomCode, gameMode = "pair") {
   if (!rooms.has(roomCode)) {
-    rooms.set(roomCode, createRoom(roomCode));
+    rooms.set(roomCode, createRoom(roomCode, gameMode));
   }
 
   return rooms.get(roomCode);
@@ -215,13 +179,13 @@ function startCountdown(room) {
   room.status = "countdown";
   room.countdown = COUNTDOWN_SECONDS;
   room.winner = null;
-  room.questionBank = [createQuestionPair(room.difficulty)];
+  room.questionBank = [generateQuestionPair(room.difficulty)];
   
   // Reset all connected players
   for (const [, player] of Object.entries(room.players)) {
     player.score = 0;
     player.questionIndex = 0;
-    player.question = room.questionBank[0][player.role] || room.questionBank[0]["A"] || createQuestion(room.difficulty);
+    player.question = room.questionBank[0][player.role] || room.questionBank[0]["A"] || generateQuestion(room.difficulty);
     player.lastResult = null;
   }
   
@@ -319,11 +283,11 @@ io.on("connection", (socket) => {
       // Reset players for new mode
       room.players = {};
       if (mode === "pair") {
-        room.players.A = createPlayerState("A", createQuestion("easy"));
-        room.players.B = createPlayerState("B", createQuestion("easy"));
+        room.players.A = createPlayerState("A", generateQuestion("easy"));
+        room.players.B = createPlayerState("B", generateQuestion("easy"));
       } else {
         for (let i = 1; i <= 5; i++) {
-          room.players[String(i)] = createPlayerState(String(i), createQuestion("easy"));
+          room.players[String(i)] = createPlayerState(String(i), generateQuestion("easy"));
         }
       }
     }
@@ -339,11 +303,11 @@ io.on("connection", (socket) => {
     }
 
     room.difficulty = ["easy", "medium", "hard"].includes(difficulty) ? difficulty : "easy";
-    room.questionBank = [createQuestionPair(room.difficulty)];
+    room.questionBank = [generateQuestionPair(room.difficulty)];
     
     for (const [, player] of Object.entries(room.players)) {
       player.questionIndex = 0;
-      player.question = room.questionBank[0][player.role] || room.questionBank[0]["A"] || createQuestion(room.difficulty);
+      player.question = room.questionBank[0][player.role] || room.questionBank[0]["A"] || generateQuestion(room.difficulty);
     }
     
     emitRoomState(room.roomCode);
@@ -379,12 +343,12 @@ io.on("connection", (socket) => {
     room.status = "waiting";
     room.countdown = null;
     room.winner = null;
-    room.questionBank = [createQuestionPair(room.difficulty)];
+    room.questionBank = [generateQuestionPair(room.difficulty)];
     
     for (const [, player] of Object.entries(room.players)) {
       player.score = 0;
       player.questionIndex = 0;
-      player.question = room.questionBank[0][player.role] || room.questionBank[0]["A"] || createQuestion(room.difficulty);
+      player.question = room.questionBank[0][player.role] || room.questionBank[0]["A"] || generateQuestion(room.difficulty);
       player.lastResult = null;
     }
     
@@ -417,11 +381,11 @@ io.on("connection", (socket) => {
     // Advance to next shared question pair
     player.questionIndex += 1;
     if (room.questionBank.length <= player.questionIndex) {
-      room.questionBank.push(createQuestionPair(room.difficulty));
+      room.questionBank.push(generateQuestionPair(room.difficulty));
     }
     
     const nextQuestion = room.questionBank[player.questionIndex];
-    player.question = nextQuestion[playerRole] || nextQuestion["A"] || createQuestion(room.difficulty);
+    player.question = nextQuestion[playerRole] || nextQuestion["A"] || generateQuestion(room.difficulty);
 
     emitRoomState(room.roomCode);
   });

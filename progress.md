@@ -15,3 +15,9 @@ Original prompt: Build a complete real-time web application called "Racing Calcu
   - `http://localhost:5173/player/A` returned HTTP 200
 - Playwright-style browser automation was not completed; `npx.cmd playwright --version` did not return within the quick check window.
 - Temporary dev servers used for verification were stopped afterward.
+
+2026-05-12
+- Investigated a server startup crash reporting `SyntaxError: Identifier 'createQuestion' has already been declared`.
+- Renamed the server-side question helpers to `generateQuestion` and `generateQuestionPair`, and moved difficulty config into a shared `QUESTION_RANGES` constant to remove the identifier collision risk.
+- Fixed `ensureRoom` so the requested game mode is honored when a room is first created.
+- Verified the updated `server/index.js` passes `node --check`.
