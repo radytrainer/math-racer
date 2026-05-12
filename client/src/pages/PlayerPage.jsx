@@ -17,8 +17,8 @@ const CHARACTER_MAP = {
 
 const OVERTIME_WARNING_MS = 3 * 60 * 1000;
 
-function formatDuration(durationMs) {
-  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+function formatDuration(durationMs, roundUp = false) {
+  const totalSeconds = Math.max(0, roundUp ? Math.ceil(durationMs / 1000) : Math.floor(durationMs / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
 
@@ -74,7 +74,9 @@ export default function PlayerPage() {
   const raceElapsedMs = roomState?.activeStartedAt
     ? Math.max(0, (roomState?.finishedAt || now) - roomState.activeStartedAt)
     : 0;
-  const raceDurationLabel = roomState?.activeStartedAt ? formatDuration(raceElapsedMs) : "00:00";
+  const raceDurationLabel = roomState?.activeStartedAt
+    ? formatDuration(raceElapsedMs, raceState === "finished")
+    : "00:00";
   const hasOvertimeWarning = raceState === "active" && raceElapsedMs >= OVERTIME_WARNING_MS;
 
   useEffect(() => {

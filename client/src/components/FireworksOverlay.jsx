@@ -1,4 +1,4 @@
-const BURST_COUNT = 10;
+const BURST_COUNT = 7;
 
 export default function FireworksOverlay({ message }) {
   return (
@@ -8,9 +8,10 @@ export default function FireworksOverlay({ message }) {
           key={index}
           className="firework-burst"
           style={{
-            "--burst-left": `${8 + ((index * 9) % 84)}%`,
-            "--burst-top": `${12 + ((index * 13) % 56)}%`,
-            "--burst-delay": `${index * 0.18}s`
+            "--burst-left": `${10 + ((index * 12) % 78)}%`,
+            "--burst-top": `${8 + ((index * 11) % 42)}%`,
+            "--burst-delay": `${index * 0.22}s`,
+            "--burst-hue": `${18 + index * 42}deg`
           }}
         />
       ))}

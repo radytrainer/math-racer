@@ -25,8 +25,8 @@ const STATUS_LABELS = {
 
 const OVERTIME_WARNING_MS = 3 * 60 * 1000;
 
-function formatDuration(durationMs) {
-  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+function formatDuration(durationMs, roundUp = false) {
+  const totalSeconds = Math.max(0, roundUp ? Math.ceil(durationMs / 1000) : Math.floor(durationMs / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
 
@@ -51,6 +51,7 @@ export default function DashboardPage() {
     }
   });
   const scoreboardRef = useRef(null);
+  const canEditFinishTarget = roomState ? !["active", "countdown"].includes(roomState.status) : false;
 
   useEffect(() => {
     createRoom(gameMode, finishScoreDraft)
@@ -110,7 +111,9 @@ export default function DashboardPage() {
   const raceElapsedMs = roomState?.activeStartedAt
     ? Math.max(0, (roomState?.finishedAt || now) - roomState.activeStartedAt)
     : 0;
-  const raceDurationLabel = roomState?.activeStartedAt ? formatDuration(raceElapsedMs) : "00:00";
+  const raceDurationLabel = roomState?.activeStartedAt
+    ? formatDuration(raceElapsedMs, roomState?.status === "finished")
+    : "00:00";
   const hasOvertimeWarning = roomState?.status === "active" && raceElapsedMs >= OVERTIME_WARNING_MS;
 
   useEffect(() => {
@@ -330,13 +333,13 @@ export default function DashboardPage() {
                   max="99"
                   value={finishScoreDraft}
                   onChange={(event) => setFinishScoreDraft(event.target.value)}
-                  disabled={roomState.status !== "waiting"}
+                  disabled={!canEditFinishTarget}
                 />
                 <button
                   className="secondary-button"
                   type="button"
                   onClick={handleFinishScoreApply}
-                  disabled={roomState.status !== "waiting"}
+                  disabled={!canEditFinishTarget}
                 >
                   Apply
                 </button>

@@ -32,3 +32,7 @@ Original prompt: Build a complete real-time web application called "Racing Calcu
 - Added finish celebrations with a stronger win sound, fireworks overlays, and explicit finish messages on both the teacher dashboard and player screen.
 - Added race-timer tracking plus a blinking red overtime warning signal after 3 minutes on both teacher and player views.
 - Verified the backend syntax with `node --check server/index.js` and the frontend with `npm.cmd run build`.
+- Fixed the teacher finish-target control so it can still be updated after a race finishes, which was the main reason the feature felt broken in the UI.
+- Adjusted finish-time formatting to round completed races up to the nearest second so very fast wins do not display as `00:00`.
+- Reworked the fireworks overlay from large pinwheel discs to cleaner radial burst effects with a softer message banner.
+- Verified the custom finish target end-to-end by simulating a live room where a race configured for `2` points finished correctly at `2/2`.
