@@ -71,11 +71,23 @@ function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+const CHARACTER_MAP = {
+  "1": { emoji: "🐢", name: "Turtle" },
+  "2": { emoji: "🐇", name: "Rabbit" },
+  "3": { emoji: "🐌", name: "Snail" },
+  "4": { emoji: "🐱", name: "Cat" },
+  "5": { emoji: "🦀", name: "Crab" },
+  "A": { emoji: "🐢", name: "Turtle" },
+  "B": { emoji: "🐇", name: "Rabbit" }
+};
+
 function createPlayerState(role, initialQuestion) {
+  const charData = CHARACTER_MAP[String(role)];
   return {
     role,
     socketId: null,
-    name: role === "A" ? "Turtle" : "Rabbit",
+    name: charData?.name || `Player ${role}`,
+    emoji: charData?.emoji || "🎮",
     score: 0,
     questionIndex: 0,
     question: initialQuestion,
@@ -84,10 +96,54 @@ function createPlayerState(role, initialQuestion) {
   };
 }
 
-function createRoom(roomCode) {
+function createQuestion(difficulty = "easy", forcedOperation = null) {
+  const ranges = {
+    easy: { min: 1, max: 15, operations: ["+", "-"] },
+    medium: { min: 2, max: 50, operations: ["+", "-", "*"] },
+    hard: { min: 5, max: 100, operations: ["+", "-", "*", "/"] }
+  };
+
+  const config = ranges[difficulty] || ranges.easy;
+  const a = randomInt(config.min, config.max);
+  const b = randomInt(config.min, config.max);
+  const operation = forcedOperation || config.operations[Math.floor(Math.random() * config.operations.length)];
+
+  if (operation === "+") {
+    return { prompt: `${a} + ${b}`, answer: a + b };
+  }
+
+  if (operation === "-") {
+    const top = Math.max(a, b);
+    const bottom = Math.min(a, b);
+    return { prompt: `${top} - ${bottom}`, answer: top - bottom };
+  }
+
+  if (operation === "/") {
+    const dividend = a * b;
+    return { prompt: `${dividend} ÷ ${a}`, answer: b };
+  }
+
+  return { prompt: `${a} x ${b}`, answer: a * b };
+}
+
+function createRoom(roomCode, gameMode = "pair") {
   const initialPair = createQuestionPair("easy");
+  const players = {};
+  
+  if (gameMode === "pair") {
+    players.A = createPlayerState("A", initialPair.A);
+    players.B = createPlayerState("B", initialPair.B);
+  } else {
+    // For multiple mode, create empty slots for players 1-5
+    for (let i = 1; i <= 5; i++) {
+      const role = String(i);
+      players[role] = createPlayerState(role, initialPair[role] || createQuestion("easy"));
+    }
+  }
+  
   return {
     roomCode,
+    gameMode,
     status: "waiting",
     difficulty: "easy",
     winner: null,
@@ -95,10 +151,7 @@ function createRoom(roomCode) {
     countdownTimer: null,
     teacherSocketId: null,
     questionBank: [initialPair],
-    players: {
-      A: createPlayerState("A", initialPair.A),
-      B: createPlayerState("B", initialPair.B)
-    }
+    players
   };
 }
 
@@ -118,17 +171,20 @@ function ensureRoom(roomCode) {
 }
 
 function sanitizeRoom(room) {
+  const sanitizedPlayers = {};
+  for (const [key, player] of Object.entries(room.players)) {
+    sanitizedPlayers[key] = sanitizePlayer(player);
+  }
+  
   return {
     roomCode: room.roomCode,
+    gameMode: room.gameMode,
     status: room.status,
     difficulty: room.difficulty,
     winner: room.winner,
     countdown: room.countdown,
     finishScore: FINISH_SCORE,
-    players: {
-      A: sanitizePlayer(room.players.A),
-      B: sanitizePlayer(room.players.B)
-    }
+    players: sanitizedPlayers
   };
 }
 
@@ -136,6 +192,7 @@ function sanitizePlayer(player) {
   return {
     role: player.role,
     name: player.name,
+    emoji: player.emoji,
     score: player.score,
     question: player.question.prompt,
     connected: player.connected,
@@ -159,14 +216,15 @@ function startCountdown(room) {
   room.countdown = COUNTDOWN_SECONDS;
   room.winner = null;
   room.questionBank = [createQuestionPair(room.difficulty)];
-  room.players.A.score = 0;
-  room.players.B.score = 0;
-  room.players.A.questionIndex = 0;
-  room.players.B.questionIndex = 0;
-  room.players.A.question = room.questionBank[0].A;
-  room.players.B.question = room.questionBank[0].B;
-  room.players.A.lastResult = null;
-  room.players.B.lastResult = null;
+  
+  // Reset all connected players
+  for (const [, player] of Object.entries(room.players)) {
+    player.score = 0;
+    player.questionIndex = 0;
+    player.question = room.questionBank[0][player.role] || room.questionBank[0]["A"] || createQuestion(room.difficulty);
+    player.lastResult = null;
+  }
+  
   emitRoomState(room.roomCode);
 
   room.countdownTimer = setInterval(() => {
@@ -198,7 +256,20 @@ app.get("/api/room/new", (_, res) => {
     roomCode = generateRoomCode();
   }
 
-  const room = ensureRoom(roomCode);
+  const room = ensureRoom(roomCode, "pair");
+  res.json(sanitizeRoom(room));
+});
+
+app.post("/api/room/new", (req, res) => {
+  const { gameMode } = req.body;
+  let roomCode = generateRoomCode();
+
+  while (rooms.has(roomCode)) {
+    roomCode = generateRoomCode();
+  }
+
+  const mode = ["pair", "multiple"].includes(gameMode) ? gameMode : "pair";
+  const room = ensureRoom(roomCode, mode);
   res.json(sanitizeRoom(room));
 });
 
@@ -212,12 +283,12 @@ io.on("connection", (socket) => {
     const normalizedRoom = String(roomCode).trim().toUpperCase();
     const normalizedRole = role === "teacher" ? "teacher" : String(role).toUpperCase();
 
-    if (!["teacher", "A", "B"].includes(normalizedRole)) {
-      socket.emit("room:error", "Invalid role.");
+    const room = ensureRoom(normalizedRoom, "pair");
+    
+    if (normalizedRole !== "teacher" && !room.players[normalizedRole]) {
+      socket.emit("room:error", "Invalid role for this game mode.");
       return;
     }
-
-    const room = ensureRoom(normalizedRoom);
 
     socket.join(normalizedRoom);
     socket.data.roomCode = normalizedRoom;
@@ -235,6 +306,31 @@ io.on("connection", (socket) => {
     emitRoomState(normalizedRoom);
   });
 
+  socket.on("room:setGameMode", ({ roomCode, gameMode }) => {
+    const room = rooms.get(String(roomCode).trim().toUpperCase());
+
+    if (!room || room.status === "active" || room.status === "countdown") {
+      return;
+    }
+
+    const mode = ["pair", "multiple"].includes(gameMode) ? gameMode : "pair";
+    if (room.gameMode !== mode) {
+      room.gameMode = mode;
+      // Reset players for new mode
+      room.players = {};
+      if (mode === "pair") {
+        room.players.A = createPlayerState("A", createQuestion("easy"));
+        room.players.B = createPlayerState("B", createQuestion("easy"));
+      } else {
+        for (let i = 1; i <= 5; i++) {
+          room.players[String(i)] = createPlayerState(String(i), createQuestion("easy"));
+        }
+      }
+    }
+    
+    emitRoomState(room.roomCode);
+  });
+
   socket.on("room:setDifficulty", ({ roomCode, difficulty }) => {
     const room = rooms.get(String(roomCode).trim().toUpperCase());
 
@@ -244,10 +340,12 @@ io.on("connection", (socket) => {
 
     room.difficulty = ["easy", "medium", "hard"].includes(difficulty) ? difficulty : "easy";
     room.questionBank = [createQuestionPair(room.difficulty)];
-    room.players.A.questionIndex = 0;
-    room.players.B.questionIndex = 0;
-    room.players.A.question = room.questionBank[0].A;
-    room.players.B.question = room.questionBank[0].B;
+    
+    for (const [, player] of Object.entries(room.players)) {
+      player.questionIndex = 0;
+      player.question = room.questionBank[0][player.role] || room.questionBank[0]["A"] || createQuestion(room.difficulty);
+    }
+    
     emitRoomState(room.roomCode);
   });
 
@@ -258,8 +356,12 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (!room.players.A.connected || !room.players.B.connected) {
-      socket.emit("room:error", "Both players must join before the race can start.");
+    // Check minimum players based on game mode
+    const connectedCount = Object.values(room.players).filter(p => p.connected).length;
+    const minRequired = room.gameMode === "pair" ? 2 : 2; // Minimum 2 players for any mode
+    
+    if (connectedCount < minRequired) {
+      socket.emit("room:error", `At least ${minRequired} players must join before the race can start.`);
       return;
     }
 
@@ -278,14 +380,14 @@ io.on("connection", (socket) => {
     room.countdown = null;
     room.winner = null;
     room.questionBank = [createQuestionPair(room.difficulty)];
-    room.players.A.score = 0;
-    room.players.B.score = 0;
-    room.players.A.questionIndex = 0;
-    room.players.B.questionIndex = 0;
-    room.players.A.question = room.questionBank[0].A;
-    room.players.B.question = room.questionBank[0].B;
-    room.players.A.lastResult = null;
-    room.players.B.lastResult = null;
+    
+    for (const [, player] of Object.entries(room.players)) {
+      player.score = 0;
+      player.questionIndex = 0;
+      player.question = room.questionBank[0][player.role] || room.questionBank[0]["A"] || createQuestion(room.difficulty);
+      player.lastResult = null;
+    }
+    
     emitRoomState(room.roomCode);
   });
 
@@ -317,7 +419,9 @@ io.on("connection", (socket) => {
     if (room.questionBank.length <= player.questionIndex) {
       room.questionBank.push(createQuestionPair(room.difficulty));
     }
-    player.question = room.questionBank[player.questionIndex][playerRole];
+    
+    const nextQuestion = room.questionBank[player.questionIndex];
+    player.question = nextQuestion[playerRole] || nextQuestion["A"] || createQuestion(room.difficulty);
 
     emitRoomState(room.roomCode);
   });
@@ -335,7 +439,7 @@ io.on("connection", (socket) => {
       room.teacherSocketId = null;
     }
 
-    if ((role === "A" || role === "B") && room.players[role].socketId === socket.id) {
+    if (room.players[role] && room.players[role].socketId === socket.id) {
       room.players[role].connected = false;
       room.players[role].socketId = null;
     }
